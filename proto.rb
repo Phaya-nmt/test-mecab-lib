@@ -133,30 +133,30 @@ end
 # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
 # ---------------------ここからMorph（形態素）モジュール---------
-module Morph
-  # ここでMecabモジュールの初期化を行う
-  def init_analyzer
-    # Mecab::setargで起動オプションの指定
-    Mecab::setarg('-F%m %P-\t');
-    # -区切りの品詞情報をタブで区切って出力
-  end
+# module Morph
+#   # ここでMecabモジュールの初期化を行う
+#   def init_analyzer
+#     # Mecab::setargで起動オプションの指定
+#     Mecab::setarg('-F%m %P-\t');
+#     # -区切りの品詞情報をタブで区切って出力
+#   end
 
-# textで受け取った品詞情報のペアの配列をつくる
-  def analyze(text)
-    # init_analyzerが設定した出力形式により得た文章を分解して
-    # 形態素と品詞のペアの配列を作成する
-    return Mecab::analyze(text).chomp.split(/\t/).map do |part|
+# # textで受け取った品詞情報のペアの配列をつくる
+#   def analyze(text)
+#     # init_analyzerが設定した出力形式により得た文章を分解して
+#     # 形態素と品詞のペアの配列を作成する
+#     return Mecab::analyze(text).chomp.split(/\t/).map do |part|
       
-      part.split(/ /)
-    end
-  end
+#       part.split(/ /)
+#     end
+#   end
 
-  def keyword?(part)
-    return /名詞-(一般|固有名詞|サ変接続|形容動詞語幹)/ =~ part
-  end
+#   def keyword?(part)
+#     return /名詞-(一般|固有名詞|サ変接続|形容動詞語幹)/ =~ part
+#   end
 
-  module_function :init_analyzer, :analyze, :keyword?
-end
+#   module_function :init_analyzer, :analyze, :keyword?
+# end
 # ---------------------Morph（形態素）モジュールここまで---------
 
 
@@ -216,12 +216,14 @@ class Dictionary
     end
   end
 
+# -----------------ここで形態素解析のパスを繋ぐ-----------
+
     def study(input, parts)
       study_random(input)
-      study_pattern(input, parts)
+      # study_pattern(input, parts)
 
       # return if @random.include?(input)
-      # @random.push(input)
+      @random.push(input)
     end
 
   def study_random(input)
@@ -242,6 +244,8 @@ class Dictionary
       return
     end
   end
+
+# -----------------形態素解析のパスここまで-----------
 
 
     def save
@@ -463,6 +467,7 @@ class Unmo
     # Dictionary インスタンスを作り、@resp_what @resp_random @resp_patternのそれぞれに渡す準備
 
     @emotion = Emotion.new(@dictionary)
+    # 感情値のインスタンス
 
     @resp_what = WhatResponder.new("What", @dictionary)
     # WhatResponder インスタンスを作り、インスタンス変数 @resp_whatに保持
@@ -480,9 +485,16 @@ class Unmo
 
 # ここが対話メソッドとなる dialogueメソッド
 def dialogue(input)
+  m = Mecab.new("")
   @emotion.update(input)
-  parts = Morph::analyze(input)
 
+# m が取れているかのデバック
+  # p m
+
+
+  # parts = Morph::analyze(input)
+  # parts = m.mecab_sparse_tostr(input)
+# p mecab_sparse_tostr.encode!("utf-8")
   case rand(100)
       # 以前0か1を受け取って出力していた処理を今回は、0～100で行っています
       # 今回は分岐の詳細を、ランダムで取れる数値の範囲指定で処理を分けています
@@ -504,7 +516,7 @@ def dialogue(input)
     end
 # このメソッドの最後で@responderに対して
 # responseメソッドを呼び出す
-# return @responder.response(input, @emotion.mood)
+return @responder.response(input, @emotion.mood)
 
     resp = @responder.response(input, @emotion.mood)
     @dictionary.study(input, parts)
@@ -638,7 +650,7 @@ def update(input)
 #     end
 end
 
-def adjust_mood(val)
+  def adjust_mood(val)
     # Emotion(感情)クラスで初期値を設定した感情から現行の値を変動させます
 
     @mood += val
@@ -728,35 +740,42 @@ end
 
 # プログラムタイトルの表示
 puts ('Unmo System prototype : proto')
+
 # Unmoオブジェクトを作成
 #ここが返答botの名前
 proto = Unmo.new('bot')
+m = Mecab.new("")
 
+ # puts m.sparse_tostr(input)
   # 条件が真である間は繰り返すループ
   while true
 
-# ＞を表示することで入力待ちを知らせる
-print(">")
+  # ＞を表示することで入力待ちを知らせる
+  print(">")
 
-  # 入力を変数inputに代入
-  input = gets.encode!("utf-8")
+    # 入力を変数inputに代入
+    word = gets.encode!("utf-8")
+    input = m.sparse_tostr(word)
+  #   regexpエラーに悩まされた時のデバック跡↓
+  # puts input
+  # puts input.encode!("utf-8")
 
-#   regexpエラーに悩まされた時のデバック跡↓
-# puts input
-# puts input.encode!("utf-8")
+    # 改行の削除
+    input.chomp!
 
-  # 改行の削除
-  input.chomp!
+  # 文字のチェック。空の文字が入力されたら終了
+  break if input == ""
 
-# 文字のチェック。空の文字が入力されたら終了
-break if input == ""
+  # dialogueメソッドにより入力文字列を引数として呼び出し
+  # 戻り値をresponseという変数に代入
+    response = proto.dialogue(input)
 
-# dialogueメソッドにより入力文字列を引数として呼び出し
-# 戻り値をresponseという変数に代入
-response = proto.dialogue(input)
+    # promptを＋で付けてresponseメソッドで定義した応答を表示
+    puts(prompt(proto) + response)
 
-  # promptを＋で付けてresponseメソッドで定義した応答を表示
-  puts(prompt(proto) + response)
-end
 
+# m.destroy
+  end
+
+# m.sparse_tostr
 
